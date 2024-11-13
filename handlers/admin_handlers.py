@@ -1,22 +1,26 @@
 #хендлеры, обрабатывающие действия админа
+from keyboards.keyboard_utils import Admin
+from bot import bot
 from aiogram import F, Router, Dispatcher
-from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, ContentType, FSInputFile
 import sqlite3 as sq
-from lexicon import LEXICON_RU
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from methods_db import methods
+import os
 
 db = sq.connect('system_bd.db')
 cur = db.cursor()
 
 router = Router()
 dispatcher = Dispatcher()
+UPLOAD_FOLDER = './тз'
+
 
 class Review(StatesGroup):
     awaiting_login_administration = State()
     awaiting_pin_administration = State()
+    waiting_for_excel = State()
 
 
 
@@ -52,8 +56,8 @@ async def employees_login(message: Message, state: FSMContext):
     for el in items:
         if message.text == el[5]:
             await methods.add_administration(message.from_user.id, message.text)
-            await message.answer(text='Вы успешно вошли в систему в качестве Администратора!')
-            # + клавиатура для сотрудников и меню для сотрудников??
+            await message.answer(text='Вы успешно вошли в систему в качестве Администратора!',
+                                 reply_markup=Admin.admin_kb)
             await state.clear()
             a = 1
             break
@@ -61,13 +65,34 @@ async def employees_login(message: Message, state: FSMContext):
         await message.answer(text='Пароль неверный, повторите попытку.')
         await state.set_state(Review.awaiting_pin_administration)
 
+# Этот хэндлер срабатывает на нажатие кнопки "Добавить мероприятие"
+@router.message(F.text == 'Добавить мероприятие')
+async def cmd_add_event(message: Message, state: FSMContext):
+    template_path = FSInputFile('тз_дата_название мероприятия.xlsx')
+    await message.answer_document(template_path, caption='<b>Пожалуйста, отправьте файл Excel с ТЗ на мероприятие.</b> '
+                                                         'Заполните шаблон ниже в соответствии '
+                                                         'с требованиями на мероприятие. Название файла должно быть '
+                                                         'формата "тз_дата_название мероприятия".')
+    await state.set_state(Review.waiting_for_excel)
 
 
-# Этот хэндлер срабатывает на команду /help
-@router.message(Command(commands='help'))
-async def process_help_command(message: Message):
-    await message.answer(text=LEXICON_RU['help'])
+@router.message(F.content_type == ContentType.DOCUMENT)
+async def process_document(message: Message, state: FSMContext):
+    # Проверка состояния
+    current_state = await state.get_state()
+    if current_state != 'Review:waiting_for_excel':
+        return
 
-@router.message(Command(commands='info'))
-async def process_help_command(message: Message):
-    await message.answer(text=LEXICON_RU['info'])
+    document = message.document
+    file_info = await bot.get_file(document.file_id)
+    file_path = os.path.join(UPLOAD_FOLDER, document.file_name)
+    await bot.download_file(file_info.file_path, file_path) # Загрузка файла
+
+    try:
+        await methods.add_event(file_path)
+        await message.answer(text="Мероприятие добавлено", reply_markup=Admin.admin_kb)
+        await state.clear()
+    except Exception as e:
+        await message.answer(text="Произошла ошибка при добавлении мероприятия: " + str(e),
+                             reply_markup=Admin.admin_kb)
+        await state.clear()

@@ -24,11 +24,10 @@ class Admin:
     button3 = KeyboardButton(text='Назначить организаторов')
     button4 = KeyboardButton(text='Изменить статус мероприятия')
     button5 = KeyboardButton(text='Список текущих мероприятий')
-    button6 = KeyboardButton(text='Прикрепить тз')
     admin_kb_builder = ReplyKeyboardBuilder()
     # Добавляем кнопки в билдер
     admin_kb_builder.row(button1, button2, button3,
-                         button4, button5, button6, width=2)
+                         button4, button5, width=2)
     # Создаем клавиатуру с кнопками
     admin_kb: ReplyKeyboardMarkup = admin_kb_builder.as_markup(
         one_time_keyboard=True,

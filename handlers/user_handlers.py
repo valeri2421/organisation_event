@@ -3,6 +3,7 @@ from aiogram import Router, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
 import sqlite3 as sq
+from lexicon import LEXICON_RU
 
 
 db = sq.connect('system_bd.db')
@@ -32,3 +33,12 @@ async def process_start_command(message: Message):
     if a == 0:
         await message.answer(text='Приветствую! Выберите вашу должность',
                              reply_markup=User.enter_reply)
+
+# Этот хэндлер срабатывает на команду /help
+@router.message(Command(commands='help'))
+async def process_help_command(message: Message):
+    await message.answer(text=LEXICON_RU['help'])
+
+@router.message(Command(commands='info'))
+async def process_help_command(message: Message):
+    await message.answer(text=LEXICON_RU['info'])
