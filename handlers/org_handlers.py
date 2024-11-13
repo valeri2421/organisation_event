@@ -60,3 +60,33 @@ async def employees_login(message: Message, state: FSMContext):
     if a != 1:
         await message.answer(text='Пароль неверный, повторите попытку.')
         await state.set_state(Review.awaiting_pin_organizer)
+
+@router.message(F.text == 'Предстоящие мероприятия')
+async def show_upcoming_events(message: Message):
+    # Запрос мероприятий с датой начала после текущего времени
+    cur.execute("""
+        SELECT name, type, place, date_time_start, date_time_end, status, kol_org, estimate 
+        FROM events 
+        WHERE date_time_start >= datetime('now') 
+        ORDER BY date_time_start
+    """)
+    events = cur.fetchall()
+
+    if not events:
+        await message.answer("На данный момент нет запланированных мероприятий.")
+        return
+
+    # Формируем сообщение с информацией о мероприятиях
+    response = "Предстоящие мероприятия:\n"
+    for event in events:
+        response += (
+            f"\nНазвание: {event[0]}\n"
+            f"Тип: {event[1]}\n"
+            f"Место: {event[2]}\n"
+            f"Начало: {event[3]}\n"
+            f"Конец: {event[4]}\n"
+            f"Статус: {event[5]}\n"
+            f"Количество организаторов: {event[6]}\n"
+        )
+
+    await message.answer(response)
