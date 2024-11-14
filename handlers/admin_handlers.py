@@ -96,3 +96,35 @@ async def process_document(message: Message, state: FSMContext):
         await message.answer(text="Произошла ошибка при добавлении мероприятия: " + str(e),
                              reply_markup=Admin.admin_kb)
         await state.clear()
+
+
+@router.message(F.text == 'Список текущих мероприятий')
+async def show_events(message: Message):
+    # Запрос на получение мероприятий из бд
+    events = cur.execute("""SELECT * FROM events WHERE date_time_start >= datetime('now') 
+            ORDER BY date_time_start""").fetchall()
+    if not events:
+        await message.answer("На данный момент нет запланированных мероприятий.")
+        return
+
+    # Формируем сообщение с информацией о мероприятиях
+    response = ""
+    for i in range(len(events)):
+        org_kol = cur.execute("""SELECT COUNT(*) FROM connection_table
+        WHERE id_event = %s""" % (events[i][0])).fetchall()
+        response += (
+            f"\nМероприятие №{i+1}\n"
+            f"\nНазвание: {events[i][1]}\n"
+            f"Тип: {events[i][2]}\n"
+            f"Место: {events[i][3]}\n"
+            f"Начало: {events[i][4]}\n"
+            f"Конец: {events[i][5]}\n"
+            f"Статус: {events[i][6]}\n"
+            f"Количество организаторов: {events[i][7]}\n"
+            f"Назначенное кол-во организаторов: {org_kol[0][0]}\n"
+        )
+    try:
+        await message.answer(response)
+    except Exception as e:
+        await message.answer(text="Произошла ошибка при выводе: " + str(e),
+                             reply_markup=Admin.admin_kb)
