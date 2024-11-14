@@ -90,3 +90,78 @@ async def show_upcoming_events(message: Message):
         )
 
     await message.answer(response)
+
+@router.message(F.text == 'Записаться на мероприятие')
+async def register_for_event(message: Message):
+    # Запрашиваем список мероприятий, на которые можно записаться
+    cur.execute("""
+        SELECT e.eventsID, e.name, e.date_time_start, e.kol_org, COUNT(c.id_org) as current_count
+        FROM events e
+        LEFT JOIN connection_table c ON e.eventsID = c.id_event
+        WHERE e.date_time_start >= datetime('now') 
+        GROUP BY e.eventsID
+        HAVING current_count < e.kol_org
+    """)
+    events = cur.fetchall()
+
+    if not events:
+        await message.answer("На данный момент нет мероприятий, доступных для регистрации.")
+        return
+
+    # Формируем сообщение с доступными мероприятиями
+    response = "Мероприятия, доступные для записи:\n"
+    for event in events:
+        response += f"ID: {event[0]}, Название: {event[1]}, Дата начала: {event[2]}\n"
+    response += "\nВведите ID мероприятия, на которое хотите записаться."
+
+    # Отправляем сообщение с доступными мероприятиями
+    await message.answer(response)
+
+@router.message()
+async def handle_event_registration(message: Message):
+    try:
+        #  ID мероприятия от пользователя
+        event_id = int(message.text)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректный ID мероприятия.")
+        return
+
+    #  orgID для текущего пользователя
+    cur.execute("SELECT orgID FROM organizers WHERE user_id = ?", (message.from_user.id,))
+    result = cur.fetchone()
+
+    if not result:
+        await message.answer("Вы не авторизованы как организатор.")
+        return
+
+    orgID = result[0]  # извлекаем orgID
+
+    #  проверка, что мероприятие с указанным ID доступно для записи
+    cur.execute("""
+        SELECT e.kol_org, COUNT(c.id_org) as current_count
+        FROM events e
+        LEFT JOIN connection_table c ON e.eventsID = c.id_event
+        WHERE e.eventsID = ?
+        GROUP BY e.eventsID
+        HAVING current_count < e.kol_org
+    """, (event_id,))
+    result = cur.fetchone()
+
+    if not result:
+        await message.answer("Мероприятие с указанным ID не найдено или все места уже заняты.")
+        return
+
+    # проверка, не записан ли уже организатор на это мероприятие
+    cur.execute("SELECT COUNT(*) FROM connection_table WHERE id_event = ? AND id_org = ?", (event_id, orgID))
+    already_registered = cur.fetchone()[0]
+
+    if already_registered > 0:
+        await message.answer("Вы уже записаны на это мероприятие.")
+        return
+
+    # запись организатора на мероприятие
+    cur.execute("INSERT INTO connection_table (id_event, id_org) VALUES (?, ?)", (event_id, orgID))
+    db.commit()
+
+    await message.answer("Вы успешно записались на мероприятие!")
+
