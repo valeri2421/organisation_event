@@ -1,6 +1,6 @@
 #хендлеры, обрабатывающие действия организаторов
 from aiogram import F, Router, Dispatcher
-from aiogram.types import Message
+from aiogram.types import Message, FSInputFile, ReplyKeyboardRemove
 import sqlite3 as sq
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -9,13 +9,14 @@ from keyboards.keyboard_utils import Organizer
 
 db = sq.connect('system_bd.db')
 cur = db.cursor()
-
+name_event = []
 router = Router()
 dispatcher = Dispatcher()
 
 class Review(StatesGroup):
     awaiting_login_organizer = State()
     awaiting_pin_organizer = State()
+    awaiting_for_number_event = State()
 
 
 
@@ -91,77 +92,77 @@ async def show_upcoming_events(message: Message):
 
     await message.answer(response)
 
-@router.message(F.text == 'Записаться на мероприятие')
-async def register_for_event(message: Message):
-    # Запрашиваем список мероприятий, на которые можно записаться
+@router.message(F.text == 'Сметы')
+async def add_smeta(message: Message, state: FSMContext):
+    await message.answer(text='Выберите номер мероприятия, у которого посмотреть смету')
     cur.execute("""
-        SELECT e.eventsID, e.name, e.date_time_start, e.kol_org, COUNT(c.id_org) as current_count
-        FROM events e
-        LEFT JOIN connection_table c ON e.eventsID = c.id_event
-        WHERE e.date_time_start >= datetime('now') 
-        GROUP BY e.eventsID
-        HAVING current_count < e.kol_org
-    """)
+            SELECT name FROM events""")
     events = cur.fetchall()
+    res = ""
+    for i in range(len(events)):
+        res += f'№{i + 1} ' + events[i][0] + '\n'
+    await message.answer(res)
+    await state.set_state(Review.awaiting_for_number_event)
 
-    if not events:
-        await message.answer("На данный момент нет мероприятий, доступных для регистрации.")
-        return
 
-    # Формируем сообщение с доступными мероприятиями
-    response = "Мероприятия, доступные для записи:\n"
-    for event in events:
-        response += f"ID: {event[0]}, Название: {event[1]}, Дата начала: {event[2]}\n"
-    response += "\nВведите ID мероприятия, на которое хотите записаться."
+@router.message(Review.awaiting_for_number_event)
+async def organizer_event_smeta(message: Message, state: FSMContext):
+    global name_event
+    cur.execute("SELECT * FROM events")
+    ev = cur.fetchall()
+    st = message.text
+    if st.isnumeric():
+        if int(st) > 0 and int(st) <= len(ev):
+            await message.answer(text='Выбрано мероприятие №%s' % (st))
+            await state.clear()
+            res, name, data = methods.bd_req(ev, int(st) - 1) # да или нет - есть ли смета
+            if res == 'да':
+                try:
+                    template_path = FSInputFile(f'./сметы/смета_{data[8:10]+"."+data[5:7]+"."+data[:4]}_{name}.xlsx')
+                    await message.answer_document(template_path, caption='Смета мероприятия')
+                except:
+                    await message.answer(text='Файл не найден')
+            else:
+                file1 = f'./тз/тз_{data[8:10]+"."+data[5:7]+"."+data[:4]}_{name}.xlsx'
+                name_event = [name, file1, f'./сметы/смета_{data[8:10]+"."+data[5:7]+"."+data[:4]}_{name}.xlsx']
+                file = FSInputFile(file1)
+                await message.answer_document(file, caption='Техническое задание на мероприятие')
+                await message.answer(text='У данного мероприятия нет сметы. Хотите составить?', reply_markup=Organizer.org_kb_but)
+                #await methods.compilation_estimate(name, data[8:10]+"."+data[5:7]+"."+data[:4], message)  #составление сметы
+        else:
+            await message.answer(text='Вы ввели неверный номер мероприятия')
+            await state.clear()
+    else:
+        await message.answer(text='Вы ввели не номер мероприятия')
+        await state.clear()
 
-    # Отправляем сообщение с доступными мероприятиями
-    await message.answer(response)
 
-@router.message()
-async def handle_event_registration(message: Message):
-    try:
-        #  ID мероприятия от пользователя
-        event_id = int(message.text)
-    except ValueError:
-        await message.answer("Пожалуйста, введите корректный ID мероприятия.")
-        return
+@router.message(F.text == 'Начать составление сметы')
+async def create_estimate(message: Message):
+    await message.answer(text="Выбор отдела для сметы", reply_markup=Organizer.estimate_but)
 
-    #  orgID для текущего пользователя
-    cur.execute("SELECT orgID FROM organizers WHERE user_id = ?", (message.from_user.id,))
-    result = cur.fetchone()
+@router.message(F.text == 'Видео оборудование')
+async def video_eq(message: Message):
+    global name_event
+    k = methods.video(name_event)
+    if len(k) == 0:
+       await message.answer(text='Для этого мероприятия видео оборудование не нужно')
+    else:
+        await message.answer(text=k)
 
-    if not result:
-        await message.answer("Вы не авторизованы как организатор.")
-        return
 
-    orgID = result[0]  # извлекаем orgID
 
-    #  проверка, что мероприятие с указанным ID доступно для записи
-    cur.execute("""
-        SELECT e.kol_org, COUNT(c.id_org) as current_count
-        FROM events e
-        LEFT JOIN connection_table c ON e.eventsID = c.id_event
-        WHERE e.eventsID = ?
-        GROUP BY e.eventsID
-        HAVING current_count < e.kol_org
-    """, (event_id,))
-    result = cur.fetchone()
 
-    if not result:
-        await message.answer("Мероприятие с указанным ID не найдено или все места уже заняты.")
-        return
+@router.message(F.text == 'Выйти в главное меню')
+async def end_main(message: Message):
+    await message.answer(text="Вы вышли в главное меню", reply_markup=Organizer.organizer_kb)
 
-    # проверка, не записан ли уже организатор на это мероприятие
-    cur.execute("SELECT COUNT(*) FROM connection_table WHERE id_event = ? AND id_org = ?", (event_id, orgID))
-    already_registered = cur.fetchone()[0]
 
-    if already_registered > 0:
-        await message.answer("Вы уже записаны на это мероприятие.")
-        return
 
-    # запись организатора на мероприятие
-    cur.execute("INSERT INTO connection_table (id_event, id_org) VALUES (?, ?)", (event_id, orgID))
+@router.message(F.text == 'Выйти')
+async def end_session2(message: Message):
+    cur.execute("""UPDATE organizers
+            SET user_ID = NULL WHERE orgID = 8""")
     db.commit()
-
-    await message.answer("Вы успешно записались на мероприятие!")
+    await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())
 

@@ -2,7 +2,7 @@
 
 from aiogram.types import (KeyboardButton, ReplyKeyboardMarkup,
                            InlineKeyboardButton,
-                           InlineKeyboardMarkup)
+                           InlineKeyboardMarkup, ReplyKeyboardRemove)
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 class User:
@@ -24,10 +24,11 @@ class Admin:
     button3 = KeyboardButton(text='Назначить организаторов')
     button4 = KeyboardButton(text='Изменить статус мероприятия')
     button5 = KeyboardButton(text='Список текущих мероприятий')
+    button6 = KeyboardButton(text='Выйти из системы')
     admin_kb_builder = ReplyKeyboardBuilder()
     # Добавляем кнопки в билдер
     admin_kb_builder.row(button1, button2, button3,
-                         button4, button5, width=2)
+                         button4, button5, button6, width=2)
     # Создаем клавиатуру с кнопками
     admin_kb: ReplyKeyboardMarkup = admin_kb_builder.as_markup(
         one_time_keyboard=True,
@@ -38,14 +39,33 @@ class Organizer:
     button1 = KeyboardButton(text='Предстоящие мероприятия')
     button2 = KeyboardButton(text='Записаться на мероприятие')
     button3 = KeyboardButton(text='Посмотреть тз')
-    button4 = KeyboardButton(text='Составить смету')
+    button4 = KeyboardButton(text='Сметы')
+    button5 = KeyboardButton(text='Выйти')
     organizer_kb_builder = ReplyKeyboardBuilder()
 
     organizer_kb_builder.row(button1, button2, button3,
-                             button4, width=2)
+                             button4, button5, width=2)
     # Создаем клавиатуру с кнопками
     organizer_kb: ReplyKeyboardMarkup = organizer_kb_builder.as_markup(
         one_time_keyboard=True,
         resize_keyboard=True
     )
+    but1 = KeyboardButton(text='Начать составление сметы')
+    but2 = KeyboardButton(text='Выйти в главное меню')
+    organizer_kb_but = ReplyKeyboardBuilder()
+    organizer_kb_but.row(but1, but2, width=2)
+    org_kb_but: ReplyKeyboardMarkup = organizer_kb_but.as_markup(
+        one_time_keyboard=True,
+        resize_keyboard=True
+    )
 
+    sound = KeyboardButton(text='Звуковое оборудование')
+    video = KeyboardButton(text='Видео оборудование')
+    light = KeyboardButton(text='Световое оборудование')
+    swith = KeyboardButton(text='Коммутация и прочее')
+    estimate_but_key = ReplyKeyboardBuilder()
+    estimate_but_key.row(sound, video, light, swith, but2, width=1)
+    estimate_but: ReplyKeyboardMarkup = estimate_but_key.as_markup(
+        one_time_keyboard=True,
+        resize_keyboard=True
+    )
