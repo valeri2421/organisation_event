@@ -2,7 +2,7 @@
 from keyboards.keyboard_utils import Admin
 from bot import bot
 from aiogram import F, Router, Dispatcher
-from aiogram.types import Message, ContentType, FSInputFile
+from aiogram.types import Message, ContentType, FSInputFile, ReplyKeyboardRemove
 import sqlite3 as sq
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -128,3 +128,10 @@ async def show_events(message: Message):
     except Exception as e:
         await message.answer(text="Произошла ошибка при выводе: " + str(e),
                              reply_markup=Admin.admin_kb)
+
+@router.message(F.text == 'Выйти из системы')
+async def end_session1(message: Message):
+    cur.execute("""UPDATE administration
+            SET user_ID = NULL WHERE adminID = 5""")
+    db.commit()
+    await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())
