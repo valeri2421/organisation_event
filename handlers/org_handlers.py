@@ -17,6 +17,9 @@ class Review(StatesGroup):
     awaiting_login_organizer = State()
     awaiting_pin_organizer = State()
     awaiting_for_number_event = State()
+    awaiting_for_number_eq = State()
+    awaiting_for_number_people = State()
+
 
 
 
@@ -128,7 +131,7 @@ async def organizer_event_smeta(message: Message, state: FSMContext):
                 file = FSInputFile(file1)
                 await message.answer_document(file, caption='Техническое задание на мероприятие')
                 await message.answer(text='У данного мероприятия нет сметы. Хотите составить?', reply_markup=Organizer.org_kb_but)
-                #await methods.compilation_estimate(name, data[8:10]+"."+data[5:7]+"."+data[:4], message)  #составление сметы
+                await state.clear()
         else:
             await message.answer(text='Вы ввели неверный номер мероприятия')
             await state.clear()
@@ -141,16 +144,82 @@ async def organizer_event_smeta(message: Message, state: FSMContext):
 async def create_estimate(message: Message):
     await message.answer(text="Выбор отдела для сметы", reply_markup=Organizer.estimate_but)
 
+
 @router.message(F.text == 'Видео оборудование')
-async def video_eq(message: Message):
+async def video_eq(message: Message, state: FSMContext):
     global name_event
     k = methods.video(name_event)
-    if len(k) == 0:
+    if len(k) == 1:
        await message.answer(text='Для этого мероприятия видео оборудование не нужно')
     else:
-        await message.answer(text=k)
+        await message.answer(text=k[0], reply_markup=Organizer.estimate_video)
+        name_event.append(k[1])
+        name_event.append('video')
+
+@router.message(F.text == 'Добавить оборудование')
+async def app_eq(message: Message, state: FSMContext):
+    await message.answer(text='Напишите номер оборудования, которое нужно добавить в формате: номер, количество', reply_markup=Organizer.estimate_video)
+    await state.set_state(Review.awaiting_for_number_eq)
+
+@router.message(Review.awaiting_for_number_eq)
+async def eq_state(message: Message, state: FSMContext):
+    global name_event
+    st = message.text
+    if name_event[-1] == 'video':
+        print(1)
+        res = methods.add_eq_otdel('A3', name_event, st)
+        if res[1]:
+            await message.answer(text='Оборудование добавлено',
+                             reply_markup=Organizer.estimate_video)
+
+        else:
+            await message.answer(text='Оборудование не добавилось',
+                                 reply_markup=Organizer.estimate_video)
+        name_event = res[0]
+    elif name_event[-1] == 'sound':
+        methods.add_eq_otdel('H3', name_event, st)
+    elif name_event[-1] == 'light':
+        methods.add_eq_otdel('A20', name_event, st)
+    elif name_event[-1] == 'other':
+        methods.add_eq_otdel('H20', name_event, st)
+    await state.clear()
+
+@router.message(Review.awaiting_for_number_people)
+async def people_state(message: Message, state: FSMContext):
+    global name_event
+    n = message.text
+    j = methods.add_people_smeta(n, name_event)
+    if j:
+        await message.answer(text='Технические специалисты успешно добавлены!', reply_markup=Organizer.estimate_but)
+    else:
+        await message.answer(text='Произошла ошибка! Технические специалисты не добавлены', reply_markup=Organizer.estimate_but)
+    await state.clear()
 
 
+
+@router.message(F.text == 'Добавить инженеров и дежурных')
+async def app_eq(message: Message, state: FSMContext):
+    t = 'Напишите, сколько человек требуется на мероприятие по тз в формате: кто - количество \n'
+    t += 'Список: видеоинженер, художник по свету, звукорежиссер. Например, видеоинженер - 2, звукорежиссер - 2'
+    await message.answer(text=t, reply_markup=ReplyKeyboardRemove())
+    await state.set_state(Review.awaiting_for_number_people)
+
+
+
+@router.message(F.text == 'Показать смету')
+async def see_smeta(message: Message):
+    global name_event
+    j = methods.status_smeta(name_event)
+    if j:
+        file = FSInputFile(name_event[2])
+        await message.answer_document(file, caption='Смета на мероприятие', reply_markup=Organizer.organizer_kb)
+        name_event = []
+    else:
+        await message.answer(text='Смета не составлена на данное мероприятие', reply_markup=Organizer.estimate_but)
+
+@router.message(F.text == 'Завершить добавление')
+async def end_app(message: Message):
+    await message.answer(text="Выберите следующий отдел для добавления оборудования", reply_markup=Organizer.estimate_but)
 
 
 @router.message(F.text == 'Выйти в главное меню')
@@ -162,7 +231,7 @@ async def end_main(message: Message):
 @router.message(F.text == 'Выйти')
 async def end_session2(message: Message):
     cur.execute("""UPDATE organizers
-            SET user_ID = NULL WHERE orgID = 8""")
+            SET user_ID = NULL WHERE orgID = 9""")
     db.commit()
     await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())
 

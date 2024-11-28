@@ -63,9 +63,20 @@ class Organizer:
     video = KeyboardButton(text='Видео оборудование')
     light = KeyboardButton(text='Световое оборудование')
     swith = KeyboardButton(text='Коммутация и прочее')
+    see_estimate = KeyboardButton(text='Показать смету')
     estimate_but_key = ReplyKeyboardBuilder()
-    estimate_but_key.row(sound, video, light, swith, but2, width=1)
+    estimate_but_key.row(sound, video, light, swith, but2, see_estimate, width=2)
     estimate_but: ReplyKeyboardMarkup = estimate_but_key.as_markup(
+        one_time_keyboard=True,
+        resize_keyboard=True
+    )
+
+    app_eq = KeyboardButton(text='Добавить оборудование')
+    app_people = KeyboardButton(text='Добавить инженеров и дежурных')
+    end_app = KeyboardButton(text='Завершить добавление')
+    estimate_video2 = ReplyKeyboardBuilder()
+    estimate_video2.row(app_eq, app_people, end_app, width=2)
+    estimate_video: ReplyKeyboardMarkup = estimate_video2.as_markup(
         one_time_keyboard=True,
         resize_keyboard=True
     )
