@@ -2,7 +2,7 @@
 import sqlite3 as sq
 from datetime import datetime
 from openpyxl import load_workbook
-from handlers import org_handlers
+import xlwings as xw
 
 db = sq.connect('system_bd.db')
 cur = db.cursor()
@@ -60,7 +60,7 @@ def video(name_event):
     sheet_tz = wb_tz.active
     res = ''
     if sheet_tz['B12'].value == 'да':
-        res += 'Добавление оборудования для видео отдела' + '\n'
+        res += 'Оборудование для видео отдела' + '\n'
         res += '\n'
         res += 'Комментарии от заказчика: %s' % (sheet_tz['D12'].value) + '\n'
         res += 'Справка: если есть экран, то + дежурный техник и виджей, если только проектор - видеоинженер' + '\n'
@@ -75,23 +75,91 @@ def video(name_event):
     else:
         return [res]
 
+
+def other(name_event):
+    res = ''
+    res += 'Коммутационное оборудование' + '\n'
+    res += 'Справка: кабель каналы -минимум 5 штук, минимум 10 штук xlr, dmx, 2 hdmi (далее смотреть по надобности из тз)'
+    res += '\n'
+    alll = cur.execute("""SELECT * from equipment
+                                            where sphere LIKE '%other%'""").fetchall()
+    lis = []
+    for i in range(len(alll)):
+        res += f'{i + 1}.' + alll[i][2]+ ' ' + alll[i][3] + ' ' + str(alll[i][4]) + 'р.' + '\n'
+        lis.append(alll[i])
+    return [res, lis]
+
+
+def light(name_event):
+    wb_tz = load_workbook(name_event[1])
+    sheet_tz = wb_tz.active
+    res = ''
+    if sheet_tz['B15'].value == 'да':
+        res += 'Оборудование для светового отдела' + '\n'
+        res += '\n'
+        res += 'Комментарии от заказчика: %s' % (sheet_tz['D15'].value) + '\n'
+        res += '\n'
+        alll = cur.execute("""SELECT * from equipment
+                                            where sphere LIKE '%light%'""").fetchall()
+        lis = []
+        for i in range(len(alll)):
+            res += f'{i + 1}.' + alll[i][2]+ ' ' + alll[i][3] + ' ' + str(alll[i][4]) + 'р.' + '\n'
+            lis.append(alll[i])
+        return [res, lis]
+    else:
+        return [res]
+
+
+def sound(name_event):
+    wb_tz = load_workbook(name_event[1])
+    sheet_tz = wb_tz.active
+    res = ''
+    play = ""
+    lis = []
+    if sheet_tz['B14'].value == 'да':
+        res += 'Оборудование для звукового отдела' + '\n'
+        res += '\n'
+        res += 'Комментарии от заказчика: %s' % (sheet_tz['D14'].value) + '\n'
+        res += 'Справка: для каждого вокалиста по 1 микрофону, у барабанщика минимум 3 ударных, скрипки/трубы - бодипаки, при добавлениии людей - считать плейбекера за звукорежиссера' + '\n'
+        res += '\n'
+        alll = cur.execute("""SELECT * from equipment
+                                            where sphere LIKE '%sound%'""").fetchall()
+
+        for i in range(len(alll)):
+            res += f'{i + 1}.' + alll[i][2]+ ' ' + alll[i][3] + ' ' + str(alll[i][4]) + 'р.' + '\n'
+            lis.append(alll[i])
+    if sheet_tz['B10'].value == 'да':
+        new_file_path = name_event[2]
+        workbook_sm = load_workbook(new_file_path)
+        sheet_sm = workbook_sm.active
+        if sheet_sm['H3'].value is None:
+            list_desk = cur.execute("""SELECT * from equipment
+                                                where affiliation LIKE '%Ноутбук%'""").fetchall()
+            sheet_sm['H3'] = list_desk[0][2]
+            sheet_sm['I3'] = list_desk[0][3]
+            sheet_sm['J3'] = 1
+            sheet_sm['K3'] = list_desk[0][4]
+            sheet_sm['L3'] = 1
+            sheet_sm['C41'] = 1
+            play = "Ноутбук для плейбекера мероприятия добавлен в смету по тз"
+            workbook_sm.save(new_file_path)
+    return [res, lis, play]
+
 def add_eq_otdel(num, name_event, eq):
     new_file_path = name_event[2]
     workbook_sm = load_workbook(new_file_path)
     sheet_sm = workbook_sm.active
     #нужно очищать потом список name_event, чтобы удалять оборудования с конца каждого отдела и чистить потом после всего добавления сметы этот список
-    i = int(num[1])
+    i = int(num[1:])
     k = sheet_sm[f"{num[0]}{i}"].value
     while not (k is None):
         i += 1
         k = sheet_sm[f"{num[0]}{i}"].value
     #print(name_event)
     try:
-        print(eq.split(', '))
         n_eq, kol = eq.split(', ')
-        n_eq, kol = int(n_eq), int(kol)
+        n_eq, kol = int(n_eq) - 1, int(kol)
         n = name_event[3][n_eq]
-        print(n)
         sheet_sm[f"{num[0]}{i}"] = n[2]
         next_ = chr(ord(num[0]) + 1)
         sheet_sm[f"{next_}{i}"] = n[3]
@@ -118,19 +186,25 @@ def add_people_smeta(n, name_event):
             k = i.split(' - ')
             if 'идео' in k[0]:
                 y = int(k[1])
+                if not (sheet_sm['C40'].value is None):
+                    y += sheet_sm['C40'].value
                 sheet_sm['C40'] = y
                 duty += 1 if y == 1 else y - 1
                 kol_people += y
             elif 'удожник' in k[0]:
                 y = int(k[1])
+                if not (sheet_sm['C42'].value is None):
+                    y += sheet_sm['C42'].value
                 sheet_sm['C42'] = y
                 duty += 1 if y == 1 else y - 1
                 kol_people += y
             elif 'вукореж' in k[0]:
                 y = int(k[1])
+                if not (sheet_sm['C41'].value is None):
+                    y += sheet_sm['C41'].value
                 sheet_sm['C41'] = y
-                kol_people += y
                 duty += 1 if y == 1 else y - 1
+                kol_people += y
         sheet_sm['C43'] = duty # автоматический расчет дежурных площадки
         #расчет транспорта
         new_file_path2 = name_event[1]

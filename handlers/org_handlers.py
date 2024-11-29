@@ -152,13 +152,45 @@ async def video_eq(message: Message, state: FSMContext):
     if len(k) == 1:
        await message.answer(text='Для этого мероприятия видео оборудование не нужно')
     else:
-        await message.answer(text=k[0], reply_markup=Organizer.estimate_video)
+        await message.answer(text=k[0], reply_markup=Organizer.estimate_)
         name_event.append(k[1])
         name_event.append('video')
 
+
+@router.message(F.text == 'Звуковое оборудование')
+async def video_eq(message: Message, state: FSMContext):
+    global name_event
+    k = methods.sound(name_event)
+    if len(k[0]) == 0:
+       await message.answer(text='Для этого мероприятия звуковое оборудование не нужно')
+    else:
+        await message.answer(text=k[0] + k[2], reply_markup=Organizer.estimate_)
+        name_event.append(k[1])
+        name_event.append('sound')
+
+
+@router.message(F.text == 'Световое оборудование')
+async def video_eq(message: Message, state: FSMContext):
+    global name_event
+    k = methods.light(name_event)
+    if len(k[0]) == 0:
+       await message.answer(text='Для этого мероприятия световое оборудование не нужно')
+    else:
+        await message.answer(text=k[0], reply_markup=Organizer.estimate_)
+        name_event.append(k[1])
+        name_event.append('light')
+
+@router.message(F.text == 'Коммутация и прочее')
+async def video_eq(message: Message, state: FSMContext):
+    global name_event
+    k = methods.other(name_event)
+    await message.answer(text=k[0], reply_markup=Organizer.estimate_)
+    name_event.append(k[1])
+    name_event.append('other')
+
 @router.message(F.text == 'Добавить оборудование')
 async def app_eq(message: Message, state: FSMContext):
-    await message.answer(text='Напишите номер оборудования, которое нужно добавить в формате: номер, количество', reply_markup=Organizer.estimate_video)
+    await message.answer(text='Напишите номер оборудования, которое нужно добавить в формате: номер, количество', reply_markup=Organizer.estimate_)
     await state.set_state(Review.awaiting_for_number_eq)
 
 @router.message(Review.awaiting_for_number_eq)
@@ -166,22 +198,45 @@ async def eq_state(message: Message, state: FSMContext):
     global name_event
     st = message.text
     if name_event[-1] == 'video':
-        print(1)
         res = methods.add_eq_otdel('A3', name_event, st)
         if res[1]:
             await message.answer(text='Оборудование добавлено',
-                             reply_markup=Organizer.estimate_video)
+                             reply_markup=Organizer.estimate_)
 
         else:
             await message.answer(text='Оборудование не добавилось',
-                                 reply_markup=Organizer.estimate_video)
+                                 reply_markup=Organizer.estimate_)
         name_event = res[0]
     elif name_event[-1] == 'sound':
-        methods.add_eq_otdel('H3', name_event, st)
+        res = methods.add_eq_otdel('H3', name_event, st)
+        if res[1]:
+            await message.answer(text='Оборудование добавлено',
+                                 reply_markup=Organizer.estimate_)
+
+        else:
+            await message.answer(text='Оборудование не добавилось',
+                                 reply_markup=Organizer.estimate_)
+        name_event = res[0]
     elif name_event[-1] == 'light':
-        methods.add_eq_otdel('A20', name_event, st)
+        res = methods.add_eq_otdel('A20', name_event, st)
+        if res[1]:
+            await message.answer(text='Оборудование добавлено',
+                                 reply_markup=Organizer.estimate_)
+
+        else:
+            await message.answer(text='Оборудование не добавилось',
+                                 reply_markup=Organizer.estimate_)
+        name_event = res[0]
     elif name_event[-1] == 'other':
-        methods.add_eq_otdel('H20', name_event, st)
+        res = methods.add_eq_otdel('H20', name_event, st)
+        if res[1]:
+            await message.answer(text='Оборудование добавлено',
+                                 reply_markup=Organizer.estimate_)
+
+        else:
+            await message.answer(text='Оборудование не добавилось',
+                                 reply_markup=Organizer.estimate_)
+        name_event = res[0]
     await state.clear()
 
 @router.message(Review.awaiting_for_number_people)
@@ -212,8 +267,9 @@ async def see_smeta(message: Message):
     j = methods.status_smeta(name_event)
     if j:
         file = FSInputFile(name_event[2])
-        await message.answer_document(file, caption='Смета на мероприятие', reply_markup=Organizer.organizer_kb)
+        await message.answer_document(file, caption='Смета на мероприятие! %s' % (s), reply_markup=Organizer.organizer_kb)
         name_event = []
+
     else:
         await message.answer(text='Смета не составлена на данное мероприятие', reply_markup=Organizer.estimate_but)
 

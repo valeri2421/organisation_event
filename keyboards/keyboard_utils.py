@@ -74,9 +74,9 @@ class Organizer:
     app_eq = KeyboardButton(text='Добавить оборудование')
     app_people = KeyboardButton(text='Добавить инженеров и дежурных')
     end_app = KeyboardButton(text='Завершить добавление')
-    estimate_video2 = ReplyKeyboardBuilder()
-    estimate_video2.row(app_eq, app_people, end_app, width=2)
-    estimate_video: ReplyKeyboardMarkup = estimate_video2.as_markup(
+    estimate_2 = ReplyKeyboardBuilder()
+    estimate_2.row(app_eq, app_people, end_app, width=2)
+    estimate_: ReplyKeyboardMarkup = estimate_2.as_markup(
         one_time_keyboard=True,
         resize_keyboard=True
     )
