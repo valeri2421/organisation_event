@@ -45,6 +45,21 @@ class Estimate:
     estimate_kb: ReplyKeyboardMarkup = estimate_kb_builder.as_markup(
         resize_keyboard=True
     )
+
+# кнопки для изменения статуса
+class StatusChange:
+    in_process_button = KeyboardButton(text="В процессе")
+    completed_button = KeyboardButton(text="Закончено")
+    cancelled_button = KeyboardButton(text="Отменено")
+
+    status_kb_builder = ReplyKeyboardBuilder()
+    status_kb_builder.row(in_process_button, completed_button)
+    status_kb_builder.row(cancelled_button)
+
+    status_kb: ReplyKeyboardMarkup = status_kb_builder.as_markup(
+        resize_keyboard=True
+    )
+
 class Organizer:
     button1 = KeyboardButton(text='Предстоящие мероприятия')
     button2 = KeyboardButton(text='Записаться на мероприятие')

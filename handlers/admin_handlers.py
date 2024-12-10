@@ -1,5 +1,5 @@
 #хендлеры, обрабатывающие действия админа
-from keyboards.keyboard_utils import Admin, Estimate
+from keyboards.keyboard_utils import Admin, Estimate, StatusChange
 from bot import bot
 from aiogram import F, Router, Dispatcher, types
 from aiogram.types import Message, ContentType, FSInputFile, ReplyKeyboardRemove
@@ -25,9 +25,9 @@ class Review(StatesGroup):
     awaiting_login_administration = State()
     awaiting_pin_administration = State()
     waiting_for_excel = State()
-
-
-
+    awaiting_event_id = State()
+    awaiting_event_id_for_status = State()
+    awaiting_status_change = State()
 
 # Этот хэндлер срабатывает на нажатие кнопки "Администратор"
 @router.message(F.text == 'Администратор')
@@ -143,7 +143,7 @@ async def get_event_list():
 
 
 @router.message(F.text == 'Проверить наличие сметы')
-async def handle_check_budget(message: types.Message):
+async def handle_check_budget(message: types.Message, state: FSMContext):
     # Получаем список мероприятий
     events = await get_event_list()
 
@@ -158,6 +158,7 @@ async def handle_check_budget(message: types.Message):
 
     await message.answer(event_list_str)
     await message.answer("Пожалуйста, отправьте ID мероприятия для проверки наличия сметы.")
+    await state.set_state(Review.awaiting_event_id)
 
 
 # Функция для извлечения названия мероприятия из имени файла
@@ -167,7 +168,7 @@ def extract_event_name_from_filename(filename):
         return match.group(1).strip()  # Название мероприятия
     return None
 
-@router.message(F.text.isdigit())
+@router.message(Review.awaiting_event_id, F.text.isdigit())
 async def handle_event_id(message: types.Message, state: FSMContext):
     try:
         event_id = int(message.text)
@@ -230,3 +231,87 @@ async def handle_agreement(message: types.Message, state: FSMContext):
         db.commit()
         await message.answer("Смета не согласована.")
     await message.answer("Главное меню:", reply_markup=Admin.admin_kb)
+
+@router.message(F.text == 'Изменить статус мероприятия')
+async def handle_change_status(message: types.Message, state: FSMContext):
+    cur.execute("SELECT eventsID, name, status FROM events")
+    events = cur.fetchall()
+
+    if not events:
+        await message.answer("В базе данных нет мероприятий.")
+        return
+
+    event_list_str = "Список текущих мероприятий:\n"
+    for event in events:
+        event_list_str += f"ID: {event[0]}, Название: {event[1]}, Статус: {event[2]}\n"
+
+    await message.answer(event_list_str)
+    await message.answer("Пожалуйста, отправьте ID мероприятия, для которого хотите изменить статус.")
+    await state.set_state(Review.awaiting_event_id_for_status)
+
+@router.message(Review.awaiting_event_id_for_status, F.text.isdigit())
+async def handle_event_id_for_status(message: types.Message, state: FSMContext):
+    try:
+        event_id = int(message.text)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректный ID мероприятия.")
+        return
+
+    cur.execute("SELECT name FROM events WHERE eventsID=?", (event_id,))
+    result = cur.fetchone()
+
+    if result:
+        event_name = result[0]
+        await state.update_data(event_id=event_id)
+        await message.answer(
+            f"Вы выбрали мероприятие: '{event_name}'. Выберите новый статус:",
+            reply_markup=StatusChange.status_kb
+        )
+        await state.set_state(Review.awaiting_status_change)  # Переход в состояние изменения статуса
+    else:
+        await message.answer("Мероприятие с таким ID не найдено в базе данных. Пожалуйста, проверьте ID и попробуйте снова.")
+
+@router.message(Review.awaiting_event_id_for_status, F.text.isdigit())
+async def handle_event_id_for_status(message: types.Message, state: FSMContext):
+    try:
+        event_id = int(message.text)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректный ID мероприятия.")
+        return
+
+    cur.execute("SELECT name FROM events WHERE eventsID=?", (event_id,))
+    result = cur.fetchone()
+
+    if result:
+        event_name = result[0]
+        await state.update_data(event_id=event_id)
+        await message.answer(
+            f"Вы выбрали мероприятие: '{event_name}'. Выберите новый статус:",
+            reply_markup=StatusChange.status_kb
+        )
+        await state.set_state(Review.awaiting_status_change)  # Переход в состояние изменения статуса
+    else:
+        await message.answer("Мероприятие с таким ID не найдено в базе данных. Пожалуйста, проверьте ID и попробуйте снова.")
+
+@router.message(Review.awaiting_status_change, F.text.in_(["В процессе", "Закончено", "Отменено"]))
+async def handle_status_change(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    event_id = user_data.get('event_id')
+
+    if not event_id:
+        await message.answer("Не удалось получить ID мероприятия. Пожалуйста, начните сначала.")
+        return
+
+    status_map = {
+        "В процессе": "process",
+        "Закончено": "end",
+        "Отменено": "cancelled"
+    }
+    new_status = status_map[message.text]
+
+    cur.execute("UPDATE events SET status=? WHERE eventsID=?", (new_status, event_id))
+    db.commit()
+
+    await message.answer(f"Статус мероприятия успешно изменён на '{message.text}'.", reply_markup=Admin.admin_kb)
+    await state.clear()
+
