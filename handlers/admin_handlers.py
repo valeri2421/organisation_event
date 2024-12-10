@@ -105,7 +105,7 @@ async def process_document(message: Message, state: FSMContext):
 @router.message(F.text == 'Список текущих мероприятий')
 async def show_events(message: Message):
     # Запрос на получение мероприятий из бд
-    events = cur.execute(queries['selectFutureEvents']).fetchall()
+    events = cur.execute(queries['getEventsInProcess']).fetchall()
     if not events:
         await message.answer("На данный момент нет запланированных мероприятий.")
         return
@@ -116,14 +116,17 @@ async def show_events(message: Message):
         org_kol = cur.execute(queries['EventInfo'] % (events[i][0])).fetchall()
         response += (
             f"\nМероприятие №{i+1}\n"
-            f"\nНазвание: {events[i][1]}\n"
+            f"\nID: {events[i][0]}\n"
+            f"Название: {events[i][1]}\n"
             f"Тип: {events[i][2]}\n"
             f"Место: {events[i][3]}\n"
-            f"Начало: {events[i][4]}\n"
-            f"Конец: {events[i][5]}\n"
+            f"Дата и время начала: {events[i][4]}\n"
+            f"Дата и время окончания: {events[i][5]}\n"
             f"Статус: {events[i][6]}\n"
             f"Количество организаторов: {events[i][7]}\n"
             f"Назначенное кол-во организаторов: {org_kol[0][0]}\n"
+            f"Смета: {events[i][8]}\n" 
+            f"{'-' * 30}\n"
         )
     try:
         await message.answer(response)
@@ -314,4 +317,3 @@ async def handle_status_change(message: types.Message, state: FSMContext):
 
     await message.answer(f"Статус мероприятия успешно изменён на '{message.text}'.", reply_markup=Admin.admin_kb)
     await state.clear()
-

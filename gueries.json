@@ -7,6 +7,6 @@
   "getAllEvents" : "SELECT * FROM events",
   "countOrg" : "SELECT e.eventsID, e.name, e.kol_org, COUNT(ct.id_org) AS registered_count FROM events e LEFT JOIN connection_table ct ON e.eventsID = ct.id_event GROUP BY e.eventsID",
   "getOrgId" : "SELECT orgID FROM organizers WHERE user_ID = ?",
-  "insertOrgToEvent" : "INSERT INTO connection_table (id_event, id_org) VALUES (?, ?)"
-
+  "insertOrgToEvent" : "INSERT INTO connection_table (id_event, id_org) VALUES (?, ?)",
+  "getEventsInProcess" : "SELECT * FROM events WHERE status = 'process'"
 }
