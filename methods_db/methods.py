@@ -2,22 +2,39 @@
 import sqlite3 as sq
 from datetime import datetime
 from openpyxl import load_workbook
-import xlwings as xw
 
 db = sq.connect('system_bd.db')
 cur = db.cursor()
 
-async def add_administration (user_id, pin):
+def add_administration (user_id, pin):
     cur.execute("UPDATE administration SET user_ID = ? WHERE password = ?",
                 (user_id, pin))
     db.commit()
 
-async def add_organizer (user_id, pin):
+def add_organizer (user_id, pin):
     cur.execute("UPDATE organizers SET user_ID = ? WHERE password_org = ?",
                 (user_id, pin))
     db.commit()
 
-async def add_event(file_path):
+def insert_event(name, type, place, date_time_start, date_time_end, status, kol_org, estimate):
+    cur.execute("""INSERT INTO events (name, type, place, date_time_start, date_time_end, status, kol_org, estimate) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (name, type, place, date_time_start, date_time_end, status, kol_org, estimate))
+
+    db.commit()
+
+def delete_admin_id(user_id):
+    cur.execute("UPDATE administration SET user_ID = NULL WHERE user_ID = ?", (user_id,))
+    db.commit()
+
+def delete_org_id(user_id):
+    cur.execute("UPDATE organizers SET user_ID = NULL WHERE user_ID = ?", (user_id,))
+    db.commit()
+def ifevent(name, date_time_start):
+    cur.execute("""SELECT COUNT(*) FROM events WHERE name = ? AND date_time_start = ?""",
+                (name, date_time_start))
+
+def add_event(file_path):
 # -----добавление мероприятия из екселя в бд-----
     wb = load_workbook(file_path)
     sheet = wb.active
@@ -41,11 +58,7 @@ async def add_event(file_path):
     if k > 0:
         raise Exception('Мероприятие уже было добавлено')
 
-    cur.execute("""INSERT INTO events (name, type, place, date_time_start, date_time_end, status, kol_org, estimate) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (name, type, place, date_time_start, date_time_end, status, kol_org, estimate))
-
-    db.commit()
+    insert_event(name, type, place, date_time_start, date_time_end, status, kol_org, estimate)
 
 def bd_req(list, num): # Запрос на проверку наличия сметы
     name = list[num][1]
@@ -184,7 +197,7 @@ def add_people_smeta(n, name_event):
         n = n.split(', ')
         for i in n:
             k = i.split(' - ')
-            if 'идео' in k[0]:
+            if 'видео' in k[0]:
                 y = int(k[1])
                 if not (sheet_sm['C40'].value is None):
                     y += sheet_sm['C40'].value

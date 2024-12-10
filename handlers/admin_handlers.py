@@ -7,6 +7,7 @@ import sqlite3 as sq
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from methods_db import methods
+import json
 import os
 
 db = sq.connect('system_bd.db')
@@ -16,6 +17,8 @@ router = Router()
 dispatcher = Dispatcher()
 UPLOAD_FOLDER = './тз'
 
+with open('./gueries.json') as f:
+    queries = json.load(f)
 
 class Review(StatesGroup):
     awaiting_login_administration = State()
@@ -34,7 +37,7 @@ async def administration_login(message: Message, state: FSMContext):
 
 @router.message(Review.awaiting_login_administration)
 async def administration_login_pin(message: Message, state: FSMContext):
-    cur.execute("SELECT * FROM administration")
+    cur.execute(queries['getAllAdmins'])
     items = cur.fetchall()
     a = 0
     for el in items:
@@ -50,12 +53,12 @@ async def administration_login_pin(message: Message, state: FSMContext):
 
 @router.message(Review.awaiting_pin_administration)
 async def employees_login(message: Message, state: FSMContext):
-    cur.execute("SELECT * FROM administration")
+    cur.execute(queries['getAllAdmins'])
     items = cur.fetchall()
     a = 0
     for el in items:
         if message.text == el[5]:
-            await methods.add_administration(message.from_user.id, message.text)
+            methods.add_administration(message.from_user.id, message.text)
             await message.answer(text='Вы успешно вошли в систему в качестве Администратора!',
                                  reply_markup=Admin.admin_kb)
             await state.clear()
@@ -89,7 +92,7 @@ async def process_document(message: Message, state: FSMContext):
     await bot.download_file(file_info.file_path, file_path) # Загрузка файла
 
     try:
-        await methods.add_event(file_path)
+        methods.add_event(file_path)
         await message.answer(text="Мероприятие добавлено", reply_markup=Admin.admin_kb)
         await state.clear()
     except Exception as e:
@@ -101,8 +104,7 @@ async def process_document(message: Message, state: FSMContext):
 @router.message(F.text == 'Список текущих мероприятий')
 async def show_events(message: Message):
     # Запрос на получение мероприятий из бд
-    events = cur.execute("""SELECT * FROM events WHERE date_time_start >= datetime('now') 
-            ORDER BY date_time_start""").fetchall()
+    events = cur.execute(queries['selectFutureEvents']).fetchall()
     if not events:
         await message.answer("На данный момент нет запланированных мероприятий.")
         return
@@ -110,8 +112,7 @@ async def show_events(message: Message):
     # Формируем сообщение с информацией о мероприятиях
     response = ""
     for i in range(len(events)):
-        org_kol = cur.execute("""SELECT COUNT(*) FROM connection_table
-        WHERE id_event = %s""" % (events[i][0])).fetchall()
+        org_kol = cur.execute(queries['EventInfo'] % (events[i][0])).fetchall()
         response += (
             f"\nМероприятие №{i+1}\n"
             f"\nНазвание: {events[i][1]}\n"
@@ -131,7 +132,5 @@ async def show_events(message: Message):
 
 @router.message(F.text == 'Выйти из системы')
 async def end_session1(message: Message):
-    cur.execute("""UPDATE administration
-            SET user_ID = NULL WHERE adminID = 5""")
-    db.commit()
+    methods.delete_admin_id(message.from_user.id)
     await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())

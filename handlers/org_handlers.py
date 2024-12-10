@@ -1,17 +1,22 @@
 #хендлеры, обрабатывающие действия организаторов
 from aiogram import F, Router, Dispatcher
-from aiogram.types import Message, FSInputFile, ReplyKeyboardRemove
+from aiogram.types import Message, FSInputFile, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 import sqlite3 as sq
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from methods_db import methods
 from keyboards.keyboard_utils import Organizer
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+import json
 
 db = sq.connect('system_bd.db')
 cur = db.cursor()
 name_event = []
 router = Router()
 dispatcher = Dispatcher()
+
+with open('./gueries.json') as f:
+    queries = json.load(f)
 
 class Review(StatesGroup):
     awaiting_login_organizer = State()
@@ -33,7 +38,7 @@ async def organizer_login(message: Message, state: FSMContext):
 
 @router.message(Review.awaiting_login_organizer)
 async def organizer_login_pin(message: Message, state: FSMContext):
-    cur.execute("SELECT * FROM organizers")
+    cur.execute(queries['getAllOrg'])
     items = cur.fetchall()
     a = 0
     for el in items:
@@ -49,12 +54,12 @@ async def organizer_login_pin(message: Message, state: FSMContext):
 
 @router.message(Review.awaiting_pin_organizer)
 async def employees_login(message: Message, state: FSMContext):
-    cur.execute("SELECT * FROM organizers")
+    cur.execute(queries['getAllOrg'])
     items = cur.fetchall()
     a = 0
     for el in items:
         if message.text == el[5]:
-            await methods.add_organizer(message.from_user.id, message.text)
+            methods.add_organizer(message.from_user.id, message.text)
             await message.answer(text='Вы успешно вошли в систему в качестве Организатора!',
                                  reply_markup=Organizer.organizer_kb)
             # + клавиатура для сотрудников и меню для сотрудников??
@@ -68,12 +73,7 @@ async def employees_login(message: Message, state: FSMContext):
 @router.message(F.text == 'Предстоящие мероприятия')
 async def show_upcoming_events(message: Message):
     # Запрос мероприятий с датой начала после текущего времени
-    cur.execute("""
-        SELECT name, type, place, date_time_start, date_time_end, status, kol_org, estimate 
-        FROM events 
-        WHERE date_time_start >= datetime('now') 
-        ORDER BY date_time_start
-    """)
+    cur.execute(queries['selectFutureEvents'])
     events = cur.fetchall()
 
     if not events:
@@ -81,25 +81,66 @@ async def show_upcoming_events(message: Message):
         return
 
     # Формируем сообщение с информацией о мероприятиях
-    response = "Предстоящие мероприятия:\n"
+    response = "<b>Предстоящие мероприятия:</b>\n"
     for event in events:
         response += (
-            f"\nНазвание: {event[0]}\n"
-            f"Тип: {event[1]}\n"
-            f"Место: {event[2]}\n"
-            f"Начало: {event[3]}\n"
-            f"Конец: {event[4]}\n"
-            f"Статус: {event[5]}\n"
-            f"Количество организаторов: {event[6]}\n"
+            f"\n<b>Название: {event[1]}</b>\n"
+            f"Тип: {event[2]}\n"
+            f"Место: {event[3]}\n"
+            f"Начало: {event[4]}\n"
+            f"Конец: {event[5]}\n"
+            f"Статус: {event[6]}\n"
+            f"Количество организаторов: {event[7]}\n"
         )
 
-    await message.answer(response)
+    await message.answer(response, reply_markup=Organizer.organizer_kb)
+
+@router.message(F.text == 'Записаться на мероприятие')
+async def registration_on_event(message: Message):
+    cur.execute(queries['countOrg'])
+    events = cur.fetchall()
+    inline_keyboard = InlineKeyboardBuilder()
+    # Создаем инлайн клавиатуру
+    buttons = []
+    for event in events:
+        eventsID, name, required_organizers, registered_count = event
+        if registered_count < required_organizers:
+            buttons.append(InlineKeyboardButton(text=name, callback_data=f'register_{eventsID}_{name}'))
+
+    for button in buttons:
+        inline_keyboard.row(button)
+    event_keyboard : InlineKeyboardMarkup = inline_keyboard.as_markup(one_time_keyboard=True)
+    await message.answer(text='Выберете мероприятие, на которое хотели бы записаться', reply_markup=event_keyboard)
+    if len(buttons) == 0:
+        await message.answer("На все мероприятия уже записались достаточное количество организаторов.")
+
+@router.callback_query(lambda callback: 'register_' in callback.data)
+async def process_callback_button(callback: CallbackQuery):
+    event_id = callback.data.split('_')[1]
+    name = callback.data.split('_')[2]
+    user_id = callback.from_user.id
+    try:
+        cur.execute(queries['getOrgId'], (user_id,))
+        organizer = cur.fetchone()
+        if organizer:
+            org_id = organizer[0]
+            cur.execute(queries['insertOrgToEvent'], (event_id, org_id))
+            db.commit()
+            await callback.message.edit_reply_markup()
+            await callback.message.answer(f"Вы успешно записались на мероприятие: {name}", reply_markup=Organizer.organizer_kb)
+        else:
+            await callback.message.edit_reply_markup()
+            await callback.message.answer("Вы не являетесь организатором!", reply_markup=Organizer.organizer_kb)
+    except Exception as e:
+        await callback.message.answer(f"Произошла ошибка при записи на мероприятие: {e}", reply_markup=Organizer.organizer_kb)
+        await callback.answer()
+
+
 
 @router.message(F.text == 'Сметы')
 async def add_smeta(message: Message, state: FSMContext):
     await message.answer(text='Выберите номер мероприятия, у которого посмотреть смету')
-    cur.execute("""
-            SELECT name FROM events""")
+    cur.execute(queries['nameEvent'])
     events = cur.fetchall()
     res = ""
     for i in range(len(events)):
@@ -111,7 +152,7 @@ async def add_smeta(message: Message, state: FSMContext):
 @router.message(Review.awaiting_for_number_event)
 async def organizer_event_smeta(message: Message, state: FSMContext):
     global name_event
-    cur.execute("SELECT * FROM events")
+    cur.execute(queries['getAllEvents'])
     ev = cur.fetchall()
     st = message.text
     if st.isnumeric():
@@ -267,7 +308,7 @@ async def see_smeta(message: Message):
     j = methods.status_smeta(name_event)
     if j:
         file = FSInputFile(name_event[2])
-        await message.answer_document(file, caption='Смета на мероприятие! %s' % (s), reply_markup=Organizer.organizer_kb)
+        await message.answer_document(file, caption='Смета на мероприятие! %s', reply_markup=Organizer.organizer_kb)
         name_event = []
 
     else:

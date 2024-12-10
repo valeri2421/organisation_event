@@ -40,7 +40,7 @@ class Organizer:
     button2 = KeyboardButton(text='Записаться на мероприятие')
     button3 = KeyboardButton(text='Посмотреть тз')
     button4 = KeyboardButton(text='Сметы')
-    button5 = KeyboardButton(text='Выйти')
+    button5 = KeyboardButton(text='Выйти из системы')
     organizer_kb_builder = ReplyKeyboardBuilder()
 
     organizer_kb_builder.row(button1, button2, button3,
