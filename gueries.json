@@ -1,12 +1,12 @@
 {
   "getAllAdmins" : "SELECT * FROM administration",
-  "selectFutureEvents" : "SELECT * FROM events WHERE date_time_start >= datetime('now') AND status = process ORDER BY date_time_start",
+  "selectFutureEvents" : "SELECT * FROM events WHERE date_time_start >= datetime('now') ORDER BY date_time_start",
   "EventInfo" : "SELECT COUNT(*) FROM connection_table WHERE id_event = %s",
   "getAllOrg" : "SELECT * FROM organizers",
   "nameEvent" : "SELECT name FROM events",
   "getAllEvents" : "SELECT * FROM events",
-  "countOrg" : "SELECT e.eventsID, e.name, e.kol_org, COUNT(ct.id_org) AS registered_count FROM events e LEFT JOIN connection_table ct ON e.eventsID = ct.id_event WHERE e.date_time_start >= datetime('now') GROUP BY e.eventsID",
+  "countOrg" : "SELECT e.eventsID, e.name, e.kol_org, COUNT(ct.id_org) AS registered_count FROM events e LEFT JOIN connection_table ct ON e.eventsID = ct.id_event GROUP BY e.eventsID",
   "getOrgId" : "SELECT orgID FROM organizers WHERE user_ID = ?",
-  "insertOrgToEvent" : "INSERT INTO connection_table (id_event, id_org) VALUES (?, ?)",
-  "IfAlreadyRegistered":"SELECT COUNT(*) FROM connection_table WHERE id_event = ? AND id_org = ?"
+  "insertOrgToEvent" : "INSERT INTO connection_table (id_event, id_org) VALUES (?, ?)"
+
 }

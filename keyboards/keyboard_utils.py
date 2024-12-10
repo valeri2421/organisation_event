@@ -20,7 +20,7 @@ class User:
     )
 class Admin:
     button1 = KeyboardButton(text='Добавить мероприятие')
-    button2 = KeyboardButton(text='Редактировать мероприятие')
+    button2 = KeyboardButton(text='Проверить наличие сметы')
     button3 = KeyboardButton(text='Назначить организаторов')
     button4 = KeyboardButton(text='Изменить статус мероприятия')
     button5 = KeyboardButton(text='Список текущих мероприятий')
@@ -34,7 +34,17 @@ class Admin:
         one_time_keyboard=True,
         resize_keyboard=True
     )
+# кнопки для согласования сметы
+class Estimate:
+    yes_button = KeyboardButton(text="Да")
+    no_button = KeyboardButton(text="Нет")
 
+    estimate_kb_builder = ReplyKeyboardBuilder()
+    estimate_kb_builder.row(yes_button, no_button)
+
+    estimate_kb: ReplyKeyboardMarkup = estimate_kb_builder.as_markup(
+        resize_keyboard=True
+    )
 class Organizer:
     button1 = KeyboardButton(text='Предстоящие мероприятия')
     button2 = KeyboardButton(text='Записаться на мероприятие')

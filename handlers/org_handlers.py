@@ -122,12 +122,7 @@ async def process_callback_button(callback: CallbackQuery):
     try:
         cur.execute(queries['getOrgId'], (user_id,))
         organizer = cur.fetchone()
-        cur.execute(queries['IfAlreadyRegistered'], (event_id, organizer))
-        already_registered = cur.fetchone()
-        if already_registered:
-            await callback.message.edit_reply_markup()
-            await callback.message.answer("Вы уже записаны на это мероприятие.")
-        elif organizer:
+        if organizer:
             org_id = organizer[0]
             cur.execute(queries['insertOrgToEvent'], (event_id, org_id))
             db.commit()
@@ -139,6 +134,7 @@ async def process_callback_button(callback: CallbackQuery):
     except Exception as e:
         await callback.message.answer(f"Произошла ошибка при записи на мероприятие: {e}", reply_markup=Organizer.organizer_kb)
         await callback.answer()
+
 
 
 @router.message(F.text == 'Сметы')

@@ -1,7 +1,7 @@
 #хендлеры, обрабатывающие действия админа
-from keyboards.keyboard_utils import Admin
+from keyboards.keyboard_utils import Admin, Estimate
 from bot import bot
-from aiogram import F, Router, Dispatcher
+from aiogram import F, Router, Dispatcher, types
 from aiogram.types import Message, ContentType, FSInputFile, ReplyKeyboardRemove
 import sqlite3 as sq
 from aiogram.fsm.context import FSMContext
@@ -9,6 +9,7 @@ from aiogram.fsm.state import StatesGroup, State
 from methods_db import methods
 import json
 import os
+import re
 
 db = sq.connect('system_bd.db')
 cur = db.cursor()
@@ -134,3 +135,98 @@ async def show_events(message: Message):
 async def end_session1(message: Message):
     methods.delete_admin_id(message.from_user.id)
     await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())
+
+async def get_event_list():
+    cur.execute("SELECT eventsID, name FROM events")
+    events = cur.fetchall()
+    return events
+
+
+@router.message(F.text == 'Проверить наличие сметы')
+async def handle_check_budget(message: types.Message):
+    # Получаем список мероприятий
+    events = await get_event_list()
+
+    if not events:
+        await message.answer("В базе данных нет мероприятий.")
+        return
+
+    # Формируем строку с ID и названием мероприятий
+    event_list_str = "Список текущих мероприятий:\n"
+    for event in events:
+        event_list_str += f"ID: {event[0]}, Название: {event[1]}\n"
+
+    await message.answer(event_list_str)
+    await message.answer("Пожалуйста, отправьте ID мероприятия для проверки наличия сметы.")
+
+
+# Функция для извлечения названия мероприятия из имени файла
+def extract_event_name_from_filename(filename):
+    match = re.match(r"смета_\d{2}\.\d{2}\.\d{4}_(.*)\.xlsx", filename)
+    if match:
+        return match.group(1).strip()  # Название мероприятия
+    return None
+
+@router.message(F.text.isdigit())
+async def handle_event_id(message: types.Message, state: FSMContext):
+    try:
+        event_id = int(message.text)
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректный ID мероприятия.")
+        return
+
+    cur.execute("SELECT name FROM events WHERE eventsID=?", (event_id,))
+    result = cur.fetchone()
+
+    if result:
+        event_name = result[0]
+        await message.answer(f"Вы выбрали мероприятие: '{event_name}'. Теперь проверим наличие сметы...")
+
+        file_found = False
+        file_path = None
+
+        # Проходим по файлам в папке ./сметы
+        for filename in os.listdir('./сметы'):
+            # Извлекаем название мероприятия из имени файла
+            extracted_name = extract_event_name_from_filename(filename)
+            if extracted_name and event_name.lower() in extracted_name.lower():  # Сравниваем названия без учета регистра
+                file_found = True
+                file_path = os.path.join('./сметы', filename)
+                break
+
+        if file_found:
+            await message.answer(f"Смета для мероприятия '{event_name}' найдена. Отправляю файл...")
+
+            input_file = FSInputFile(file_path)
+            await message.answer_document(input_file)
+
+            # Спрашиваем согласование
+            await message.answer("Согласовать смету?", reply_markup=Estimate.estimate_kb)
+
+            # Сохраняем ID мероприятия
+            await state.update_data(event_id=event_id)
+        else:
+            await message.answer(f"Смета для мероприятия '{event_name}' не найдена.")
+    else:
+        await message.answer("Мероприятие с таким ID не найдено в базе данных. Пожалуйста, проверьте ID и попробуйте снова.")
+
+# Обработчик ответа на согласование сметы
+@router.message(F.text.in_(["Да", "Нет"]))
+async def handle_agreement(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    event_id = user_data.get('event_id')
+
+    if not event_id:
+        await message.answer("Не удалось получить ID мероприятия. Пожалуйста, начните сначала.")
+        return
+
+    if message.text == "Да":
+        # Обновляем статус сметы в базе данных
+        cur.execute("UPDATE events SET estimate='да' WHERE eventsID=?", (event_id,))
+        db.commit()
+        await message.answer("Смета согласована.")
+    else:
+        cur.execute("UPDATE events SET estimate='нет' WHERE eventsID=?", (event_id,))
+        db.commit()
+        await message.answer("Смета не согласована.")
+    await message.answer("Главное меню:", reply_markup=Admin.admin_kb)
