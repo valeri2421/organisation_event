@@ -8,5 +8,14 @@
   "countOrg" : "SELECT e.eventsID, e.name, e.kol_org, COUNT(ct.id_org) AS registered_count FROM events e LEFT JOIN connection_table ct ON e.eventsID = ct.id_event GROUP BY e.eventsID",
   "getOrgId" : "SELECT orgID FROM organizers WHERE user_ID = ?",
   "insertOrgToEvent" : "INSERT INTO connection_table (id_event, id_org) VALUES (?, ?)",
-  "getEventsInProcess" : "SELECT * FROM events WHERE status = 'process'"
+  "getEventsInProcess" : "SELECT * FROM events WHERE status = 'process'",
+  "getAvailableOrg": "SELECT o.orgID, o.surname_org, o.name_org FROM organizers o LEFT JOIN connection_table c ON o.orgID = c.id_org WHERE c.id_org IS NULL OR c.id_event != ?",
+  "getEventsWithout": "SELECT e.eventsID, e.name, e.date_time_start, e.kol_org, COUNT(c.id_org) as current_count FROM events e LEFT JOIN connection_table c ON e.eventsID = c.id_event WHERE e.date_time_start >= datetime('now') GROUP BY e.eventsID HAVING current_count < e.kol_org",
+  "getOrgId2" :"SELECT orgID FROM organizers WHERE orgID = ?",
+  "getEventList": "SELECT eventsID, name FROM events",
+  "getEventNameById": "SELECT name FROM events WHERE eventsID = ?",
+  "updateEstimateYes": "UPDATE events SET estimate='да' WHERE eventsID = ?",
+  "updateEstimateNo": "UPDATE events SET estimate='нет' WHERE eventsID = ?",
+  "getEventsWithStatus": "SELECT eventsID, name, status FROM events",
+  "updateEventStatus": "UPDATE events SET status = ? WHERE eventsID = ?"
 }

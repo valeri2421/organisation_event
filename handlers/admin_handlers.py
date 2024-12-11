@@ -28,6 +28,8 @@ class Review(StatesGroup):
     awaiting_event_id = State()
     awaiting_event_id_for_status = State()
     awaiting_status_change = State()
+    awaiting_organizer_selection = State()
+    awaiting_event_selection = State()
 
 # Этот хэндлер срабатывает на нажатие кнопки "Администратор"
 @router.message(F.text == 'Администратор')
@@ -140,7 +142,7 @@ async def end_session1(message: Message):
     await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())
 
 async def get_event_list():
-    cur.execute("SELECT eventsID, name FROM events")
+    cur.execute(queries["getEventList"])
     events = cur.fetchall()
     return events
 
@@ -179,7 +181,7 @@ async def handle_event_id(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите корректный ID мероприятия.")
         return
 
-    cur.execute("SELECT name FROM events WHERE eventsID=?", (event_id,))
+    cur.execute(queries["getEventNameById"], (event_id,))
     result = cur.fetchone()
 
     if result:
@@ -226,18 +228,18 @@ async def handle_agreement(message: types.Message, state: FSMContext):
 
     if message.text == "Да":
         # Обновляем статус сметы в базе данных
-        cur.execute("UPDATE events SET estimate='да' WHERE eventsID=?", (event_id,))
+        cur.execute(queries["updateEstimateYes"], (event_id,))
         db.commit()
         await message.answer("Смета согласована.")
     else:
-        cur.execute("UPDATE events SET estimate='нет' WHERE eventsID=?", (event_id,))
+        cur.execute(queries["updateEstimateNo"], (event_id,))
         db.commit()
         await message.answer("Смета не согласована.")
     await message.answer("Главное меню:", reply_markup=Admin.admin_kb)
 
 @router.message(F.text == 'Изменить статус мероприятия')
 async def handle_change_status(message: types.Message, state: FSMContext):
-    cur.execute("SELECT eventsID, name, status FROM events")
+    cur.execute(queries["getEventsWithStatus"])
     events = cur.fetchall()
 
     if not events:
@@ -260,7 +262,7 @@ async def handle_event_id_for_status(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите корректный ID мероприятия.")
         return
 
-    cur.execute("SELECT name FROM events WHERE eventsID=?", (event_id,))
+    cur.execute(queries["getEventNameById"], (event_id,))
     result = cur.fetchone()
 
     if result:
@@ -282,7 +284,7 @@ async def handle_event_id_for_status(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите корректный ID мероприятия.")
         return
 
-    cur.execute("SELECT name FROM events WHERE eventsID=?", (event_id,))
+    cur.execute(queries["getEventNameById"], (event_id,))
     result = cur.fetchone()
 
     if result:
@@ -312,8 +314,89 @@ async def handle_status_change(message: types.Message, state: FSMContext):
     }
     new_status = status_map[message.text]
 
-    cur.execute("UPDATE events SET status=? WHERE eventsID=?", (new_status, event_id))
+    cur.execute(queries["updateEventStatus"], (new_status, event_id))
     db.commit()
 
     await message.answer(f"Статус мероприятия успешно изменён на '{message.text}'.", reply_markup=Admin.admin_kb)
+    await state.clear()
+
+
+@router.message(F.text == 'Назначить организаторов')
+async def start_assign_organizers(message: Message, state: FSMContext):
+    # Получаем список мероприятий с недостающими организаторами
+    cur.execute(queries["getEventsWithout"])
+    events = cur.fetchall()
+
+    if not events:
+        await message.answer("На данный момент нет мероприятий, доступных для регистрации.")
+        return
+
+    # Формируем сообщение с доступными мероприятиями
+    response = "Мероприятия, доступные для записи:\n"
+    for event in events:
+        response += f"ID: {event[0]}, Название: {event[1]}, Дата начала: {event[2]}\n"
+
+    response += "\nТеперь выберите ID мероприятия, для которого хотите назначить организаторов."
+
+    await message.answer(response)
+    await state.set_state(Review.awaiting_event_selection)
+
+
+@router.message(Review.awaiting_event_selection)
+async def handle_event_selection(message: Message, state: FSMContext):
+    event_id = message.text
+
+    # Проверка, что введен ID мероприятия
+    if not event_id.isdigit():
+        await message.answer("Пожалуйста, введите правильный ID мероприятия.")
+        return
+
+    event_id = int(event_id)
+
+    # Получаем список организаторов, которые еще не назначены
+    cur.execute(queries["getAvailableOrg"], (event_id,))
+    available_organizers = cur.fetchall()
+
+    if not available_organizers:
+        await message.answer("Нет доступных организаторов для назначения.")
+        return
+
+    response = "Доступные организаторы:\n"
+    for org in available_organizers:
+        response += f"ID: {org[0]},  {org[1]}  {org[2]}\n"
+
+    response += "\nВведите ID организатора, которого хотите назначить."
+
+    await state.update_data(event_id=event_id)
+    await message.answer(response)
+    await state.set_state(Review.awaiting_organizer_selection)  # Переходим к состоянию выбора организатора
+
+
+@router.message(Review.awaiting_organizer_selection)
+async def handle_organizer_selection(message: Message, state: FSMContext):
+    organizer_id = message.text
+
+    # Проверка на корректность ввода ID организатора
+    if not organizer_id.isdigit():
+        await message.answer("Пожалуйста, введите правильный ID организатора.")
+        return
+
+    organizer_id = int(organizer_id)
+
+    # Получаем данные о выбранном организаторе
+    cur.execute(queries["getOrgId2"], (organizer_id,))
+    organizer = cur.fetchone()
+
+    if not organizer:
+        await message.answer("Такого организатора не существует.")
+        return
+
+    user_data = await state.get_data()
+    event_id = user_data.get("event_id")
+
+    # Добавляем запись в таблицу connection
+    cur.execute(queries["insertOrgToEvent"], (event_id, organizer_id))
+    db.commit()
+
+    await message.answer(f"Организатор с ID: {organizer_id} успешно назначен на мероприятие с ID: {event_id}.", reply_markup=Admin.admin_kb)
     await state.clear()
