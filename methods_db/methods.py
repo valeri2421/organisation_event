@@ -197,7 +197,7 @@ def add_people_smeta(n, name_event):
         n = n.split(', ')
         for i in n:
             k = i.split(' - ')
-            if 'видео' in k[0]:
+            if 'идео' in k[0]:
                 y = int(k[1])
                 if not (sheet_sm['C40'].value is None):
                     y += sheet_sm['C40'].value

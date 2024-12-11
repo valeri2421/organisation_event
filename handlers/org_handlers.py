@@ -116,23 +116,32 @@ async def registration_on_event(message: Message):
 
 @router.callback_query(lambda callback: 'register_' in callback.data)
 async def process_callback_button(callback: CallbackQuery):
+
     event_id = callback.data.split('_')[1]
     name = callback.data.split('_')[2]
     user_id = callback.from_user.id
     try:
         cur.execute(queries['getOrgId'], (user_id,))
         organizer = cur.fetchone()
-        if organizer:
-            org_id = organizer[0]
-            cur.execute(queries['insertOrgToEvent'], (event_id, org_id))
-            db.commit()
-            await callback.message.edit_reply_markup()
-            await callback.message.answer(f"Вы успешно записались на мероприятие: {name}", reply_markup=Organizer.organizer_kb)
+        cur.execute(queries['IfAlreadyRegistered'], (event_id, organizer[0]))
+        already_registered = cur.fetchone()
+        if already_registered[0] == 0:
+            if organizer:
+                org_id = organizer[0]
+                cur.execute(queries['insertOrgToEvent'], (event_id, org_id))
+                db.commit()
+                await callback.message.edit_reply_markup()
+                await callback.message.answer(f"Вы успешно записались на мероприятие: {name}",
+                                              reply_markup=Organizer.organizer_kb)
+            else:
+                await callback.message.edit_reply_markup()
+                await callback.message.answer("Вы не являетесь организатором!", reply_markup=Organizer.organizer_kb)
         else:
             await callback.message.edit_reply_markup()
-            await callback.message.answer("Вы не являетесь организатором!", reply_markup=Organizer.organizer_kb)
+            await callback.message.answer("Вы уже записаны на это мероприятие.", reply_markup=Organizer.organizer_kb)
     except Exception as e:
-        await callback.message.answer(f"Произошла ошибка при записи на мероприятие: {e}", reply_markup=Organizer.organizer_kb)
+        await callback.message.answer(f"Произошла ошибка при записи на мероприятие: {e}",
+                                      reply_markup=Organizer.organizer_kb)
         await callback.answer()
 
 
@@ -325,10 +334,8 @@ async def end_main(message: Message):
 
 
 
-@router.message(F.text == 'Выйти')
+@router.message(F.text == 'Выйти из системы')
 async def end_session2(message: Message):
-    cur.execute("""UPDATE organizers
-            SET user_ID = NULL WHERE orgID = 9""")
-    db.commit()
+    methods.delete_org_id(message.from_user.id)
     await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())
 
