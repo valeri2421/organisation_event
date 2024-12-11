@@ -144,7 +144,33 @@ async def process_callback_button(callback: CallbackQuery):
                                       reply_markup=Organizer.organizer_kb)
         await callback.answer()
 
+@router.message(F.text == 'Посмотреть тз')
+async def show_tz(message: Message):
+    cur.execute(queries['selectFutureEvents'])
+    events = cur.fetchall()
+    inline_keyboard2 = InlineKeyboardBuilder()
+    # Создаем инлайн клавиатуру
+    buttons2 = []
+    for event in events:
+        buttons2.append(InlineKeyboardButton(text=event[1], callback_data=f'showtz_{event[1]}_{event[4][:10]}'))
 
+    for button in buttons2:
+        inline_keyboard2.row(button)
+    all_event_keyboard: InlineKeyboardMarkup = inline_keyboard2.as_markup(one_time_keyboard=True)
+    await message.answer(text='Выберете мероприятие, для которого хотели бы просмотреть тз', reply_markup=all_event_keyboard)
+
+@router.callback_query(lambda callback: 'showtz_' in callback.data)
+async def process_button_for_tz(callback: CallbackQuery):
+    name = callback.data.split('_')[1]
+    date = callback.data.split('_')[2]
+    filetz = f'./тз/тз_{date[8:10]+"."+date[5:7]+"."+date[:4]}_{name}.xlsx'
+    if filetz:
+        file = FSInputFile(filetz)
+        await callback.message.edit_reply_markup()
+        await callback.message.answer_document(file, caption='Техническое задание на мероприятие.', reply_markup=Organizer.organizer_kb)
+    else:
+        await callback.message.edit_reply_markup()
+        await callback.message.answer("На данное мероприятие еще не загружено техническое задание.", reply_markup=Organizer.organizer_kb)
 
 @router.message(F.text == 'Сметы')
 async def add_smeta(message: Message, state: FSMContext):
