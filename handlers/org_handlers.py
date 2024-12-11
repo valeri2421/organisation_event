@@ -95,6 +95,31 @@ async def show_upcoming_events(message: Message):
 
     await message.answer(response, reply_markup=Organizer.organizer_kb)
 
+@router.message(F.text == 'Мои мероприятия')
+async def show_my_events(message: Message):
+    # Запрос мероприятий с датой начала после текущего времени
+    cur.execute(queries['selectMyFutureEvents'], (message.from_user.id,))
+    events = cur.fetchall()
+
+    if not events:
+        await message.answer("На данный момент у вас нет запланированных мероприятий.")
+        return
+
+    # Формируем сообщение с информацией о мероприятиях
+    response = "<b>Ваши предстоящие мероприятия:</b>\n"
+    for event in events:
+        response += (
+            f"\n<b>Название: {event[1]}</b>\n"
+            f"Тип: {event[2]}\n"
+            f"Место: {event[3]}\n"
+            f"Начало: {event[4]}\n"
+            f"Конец: {event[5]}\n"
+            f"Статус: {event[6]}\n"
+            f"Количество организаторов: {event[7]}\n"
+        )
+
+    await message.answer(response, reply_markup=Organizer.organizer_kb)
+
 @router.message(F.text == 'Записаться на мероприятие')
 async def registration_on_event(message: Message):
     cur.execute(queries['countOrg'])

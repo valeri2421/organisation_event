@@ -62,14 +62,15 @@ class StatusChange:
 
 class Organizer:
     button1 = KeyboardButton(text='Предстоящие мероприятия')
-    button2 = KeyboardButton(text='Записаться на мероприятие')
-    button3 = KeyboardButton(text='Посмотреть тз')
-    button4 = KeyboardButton(text='Сметы')
-    button5 = KeyboardButton(text='Выйти из системы')
+    button2 = KeyboardButton(text='Мои мероприятия')
+    button3 = KeyboardButton(text='Записаться на мероприятие')
+    button4 = KeyboardButton(text='Посмотреть тз')
+    button5 = KeyboardButton(text='Сметы')
+    button6 = KeyboardButton(text='Выйти из системы')
     organizer_kb_builder = ReplyKeyboardBuilder()
 
     organizer_kb_builder.row(button1, button2, button3,
-                             button4, button5, width=2)
+                             button4, button5, button6, width=2)
     # Создаем клавиатуру с кнопками
     organizer_kb: ReplyKeyboardMarkup = organizer_kb_builder.as_markup(
         one_time_keyboard=True,
