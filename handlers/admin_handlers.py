@@ -400,3 +400,22 @@ async def handle_organizer_selection(message: Message, state: FSMContext):
 
     await message.answer(f"Организатор с ID: {organizer_id} успешно назначен на мероприятие с ID: {event_id}.", reply_markup=Admin.admin_kb)
     await state.clear()
+
+    cur.execute(queries['selectUserIdOrg'], (organizer_id, ))
+    a = cur.fetchall()
+    user_id = a[0][0]
+    cur.execute(queries['getEventInfoById'], (event_id, ))
+    events = cur.fetchall()
+    response = "<b>Вам назначено мероприятие:</b>\n"
+    for event in events:
+        response += (
+            f"\n<b>Название: {event[1]}</b>\n"
+            f"Тип: {event[2]}\n"
+            f"Место: {event[3]}\n"
+            f"Начало: {event[4]}\n"
+            f"Конец: {event[5]}\n"
+            f"Статус: {event[6]}\n"
+            f"Количество организаторов: {event[7]}\n"
+        )
+
+    await bot.send_message(chat_id=user_id, text=response)

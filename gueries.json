@@ -19,5 +19,7 @@
   "getEventsWithStatus": "SELECT eventsID, name, status FROM events",
   "updateEventStatus": "UPDATE events SET status = ? WHERE eventsID = ?",
   "IfAlreadyRegistered":"SELECT COUNT(*) FROM connection_table WHERE id_event = ? AND id_org = ?",
-  "selectMyFutureEvents" : "SELECT * FROM events e JOIN connection_table c ON e.eventsID = c.id_event JOIN organizers o ON c.id_org = o.orgID WHERE date_time_start >= datetime('now') AND status = 'process' AND o.user_ID = ? ORDER BY date_time_start"
+  "selectMyFutureEvents" : "SELECT * FROM events e JOIN connection_table c ON e.eventsID = c.id_event JOIN organizers o ON c.id_org = o.orgID WHERE date_time_start >= datetime('now') AND status = 'process' AND o.user_ID = ? ORDER BY date_time_start",
+  "selectUserIdOrg" : "SELECT user_ID FROM organizers WHERE orgID = ?",
+  "getEventInfoById": "SELECT * FROM events WHERE eventsID = ?"
 }
