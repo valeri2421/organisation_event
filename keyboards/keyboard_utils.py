@@ -1,4 +1,4 @@
-#Вспомогательные функции/методы, помогающие формировать клавиатуры.
+# Вспомогательные функции/методы, помогающие формировать клавиатуры.
 
 from aiogram.types import (KeyboardButton, ReplyKeyboardMarkup,
                            InlineKeyboardButton,
@@ -24,7 +24,7 @@ class Admin:
     button3 = KeyboardButton(text='Назначить организаторов')
     button4 = KeyboardButton(text='Изменить статус мероприятия')
     button5 = KeyboardButton(text='Список текущих мероприятий')
-    button6 = KeyboardButton(text='Выйти из системы')
+    button6 = KeyboardButton(text='Выйти')
     admin_kb_builder = ReplyKeyboardBuilder()
     # Добавляем кнопки в билдер
     admin_kb_builder.row(button1, button2, button3,
@@ -98,7 +98,7 @@ class Organizer:
     )
 
     app_eq = KeyboardButton(text='Добавить оборудование')
-    app_people = KeyboardButton(text='Добавить инженеров и дежурных')
+    app_people = KeyboardButton(text='Добавить инженеров')
     end_app = KeyboardButton(text='Завершить добавление')
     estimate_2 = ReplyKeyboardBuilder()
     estimate_2.row(app_eq, app_people, end_app, width=2)

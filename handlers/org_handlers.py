@@ -1,4 +1,4 @@
-#хендлеры, обрабатывающие действия организаторов
+# хендлеры, обрабатывающие действия организаторов
 from aiogram import F, Router, Dispatcher
 from aiogram.types import Message, FSInputFile, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 import sqlite3 as sq
@@ -182,7 +182,7 @@ async def show_tz(message: Message):
     for button in buttons2:
         inline_keyboard2.row(button)
     all_event_keyboard: InlineKeyboardMarkup = inline_keyboard2.as_markup(one_time_keyboard=True)
-    await message.answer(text='Выберете мероприятие, для которого хотели бы просмотреть тз', reply_markup=all_event_keyboard)
+    await message.answer(text='Выберите мероприятие, для которого хотели бы просмотреть тз', reply_markup=all_event_keyboard)
 
 @router.callback_query(lambda callback: 'showtz_' in callback.data)
 async def process_button_for_tz(callback: CallbackQuery):
@@ -353,7 +353,7 @@ async def people_state(message: Message, state: FSMContext):
 
 
 
-@router.message(F.text == 'Добавить инженеров и дежурных')
+@router.message(F.text == 'Добавить инженеров')
 async def app_eq(message: Message, state: FSMContext):
     t = 'Напишите, сколько человек требуется на мероприятие по тз в формате: кто - количество \n'
     t += 'Список: видеоинженер, художник по свету, звукорежиссер. Например, видеоинженер - 2, звукорежиссер - 2'
@@ -368,7 +368,7 @@ async def see_smeta(message: Message):
     j = methods.status_smeta(name_event)
     if j:
         file = FSInputFile(name_event[2])
-        await message.answer_document(file, caption='Смета на мероприятие! %s', reply_markup=Organizer.organizer_kb)
+        await message.answer_document(file, caption='Смета на мероприятие!', reply_markup=Organizer.organizer_kb)
         name_event = []
 
     else:

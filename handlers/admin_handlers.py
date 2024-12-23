@@ -136,7 +136,7 @@ async def show_events(message: Message):
         await message.answer(text="Произошла ошибка при выводе: " + str(e),
                              reply_markup=Admin.admin_kb)
 
-@router.message(F.text == 'Выйти из системы')
+@router.message(F.text == 'Выйти')
 async def end_session1(message: Message):
     methods.delete_admin_id(message.from_user.id)
     await message.answer(text="Вы вышли из системы, нажмите /start для входа", reply_markup=ReplyKeyboardRemove())
@@ -419,3 +419,4 @@ async def handle_organizer_selection(message: Message, state: FSMContext):
         )
 
     await bot.send_message(chat_id=user_id, text=response)
+
